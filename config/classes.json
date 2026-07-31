@@ -1,0 +1,13 @@
+[
+  {"label": "sensor", "description": "sensor de instrumentação, transdutor, sonda, encoder ou elemento sensor"},
+  {"label": "aquisicao_dados", "description": "sistema de aquisição de dados, DAQ, condicionador de sinais, módulo de aquisição ou logger"},
+  {"label": "instrumento_medicao", "description": "instrumento de medição de bancada ou portátil, multímetro, osciloscópio, fonte, calibrador ou medidor"},
+  {"label": "controlador_eletronica", "description": "placa eletrônica, microcontrolador, PLC, computador embarcado, módulo eletrônico ou circuito de controle"},
+  {"label": "energia_alimentacao", "description": "fonte de alimentação, bateria, conversor, distribuição de energia, fusível ou componente de potência"},
+  {"label": "cabos_conectores", "description": "cabos, chicotes, conectores, bornes, prensa-cabos ou interconexões elétricas"},
+  {"label": "atuador_motor", "description": "motor, servo, atuador, ESC, driver de motor ou mecanismo acionado eletricamente"},
+  {"label": "montagem_instrumentacao", "description": "montagem mecânica de instrumentação, suporte, fixação, estrutura, bracket ou instalação física de sensor"},
+  {"label": "setup_ensaio", "description": "visão geral do setup de ensaio mostrando bancada, tanque, modelo, estrutura e instrumentação integrada"},
+  {"label": "identificacao_documentacao", "description": "etiqueta, placa de identificação, número de série, tela, documento, anotação ou informação textual fotografada"},
+  {"label": "outro", "description": "imagem relacionada à instrumentação que não se encaixa claramente nas demais categorias"}
+]
