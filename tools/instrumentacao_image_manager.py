@@ -36,8 +36,9 @@ IMAGE_EXTENSIONS = {
 }
 FOTOS_COMPONENT = "fotos"
 INSTRUMENTATION_COMPONENT = "instrumentacao"
-DEFAULT_ROOT = Path(r"\\LABOCEANOSERVER\laboceano\Projetos")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SANDBOX_FOLDER_NAME = "Dados e Marina"
+LABOCEANO_SERVER_ROOT = Path(r"\\LABOCEANOSERVER\laboceano\Projetos")
 DEFAULT_CLASSES_FILE = PROJECT_ROOT / "config" / "classes.json"
 DEFAULT_MANIFEST = Path("classification_manifest.csv")
 DEFAULT_TEMPLATE = "{class}_{inspection}_{date}_{time}_{seq:03d}"
@@ -79,6 +80,51 @@ class RenamePlan:
 
 class ImageClassifier(Protocol):
     def classify(self, path: Path) -> Classification: ...
+
+
+
+
+def _looks_like_network_path(path: Path) -> bool:
+    raw = os.fspath(path).strip()
+    return raw.startswith("\\\\") or raw.startswith("//")
+
+
+def _default_local_root() -> Path:
+    """Locate a local sandbox named 'Dados e Marina' without touching the network."""
+    env_root = os.environ.get("IIM_SANDBOX_ROOT")
+    candidates: list[Path] = []
+    if env_root:
+        candidates.append(Path(env_root))
+    candidates.extend([
+        PROJECT_ROOT / SANDBOX_FOLDER_NAME,
+        PROJECT_ROOT.parent / SANDBOX_FOLDER_NAME,
+        Path.cwd() / SANDBOX_FOLDER_NAME,
+        Path.cwd().parent / SANDBOX_FOLDER_NAME,
+    ])
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if candidate.exists() and candidate.is_dir() and not _looks_like_network_path(candidate):
+            return candidate
+    tried = "\n  - ".join(str(p) for p in candidates)
+    raise FileNotFoundError(
+        "Sandbox local não encontrada. Crie/copiei a pasta 'Dados e Marina' "
+        "dentro ou ao lado do repositório, defina IIM_SANDBOX_ROOT, ou passe um "
+        "caminho local explicitamente.\nTentativas:\n  - " + tried
+    )
+
+
+def _resolve_root(root: Path | None, *, allow_network: bool) -> Path:
+    selected = _default_local_root() if root is None else root
+    if _looks_like_network_path(selected) and not allow_network:
+        raise SafetyError(
+            "Acesso a caminho de rede está BLOQUEADO por padrão. "
+            "Use --allow-network somente quando quiser acessar conscientemente o servidor."
+        )
+    return selected
 
 
 def _normalize_component(value: str) -> str:
@@ -602,8 +648,15 @@ def parse_args() -> argparse.Namespace:
             "manifesto -> rename seguro."
         )
     )
-    parser.add_argument("mode", choices=("discover", "scan", "classify", "apply", "watch"))
-    parser.add_argument("root", type=Path, nargs="?", default=DEFAULT_ROOT)
+    parser.add_argument(
+        "mode", nargs="?", default="discover",
+        choices=("discover", "scan", "classify", "apply", "watch"),
+        help="Padrão: discover (somente leitura).",
+    )
+    parser.add_argument(
+        "root", type=Path, nargs="?", default=None,
+        help="Padrão: sandbox local 'Dados e Marina'; nunca o servidor.",
+    )
     parser.add_argument("--classes", type=Path, default=DEFAULT_CLASSES_FILE)
     parser.add_argument("--classifier", choices=("clip",), default="clip")
     parser.add_argument("--model", default=DEFAULT_MODEL)
@@ -618,13 +671,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--interval", type=float, default=2.0)
     parser.add_argument("--settle-seconds", type=float, default=3.0)
     parser.add_argument("--rediscover-seconds", type=float, default=60.0)
+    parser.add_argument(
+        "--allow-network", action="store_true",
+        help="Libera explicitamente caminhos UNC/de rede. Bloqueados por padrão.",
+    )
+    parser.add_argument(
+        "--allow-rename", action="store_true",
+        help="Obrigatório para modos que alteram nomes (apply/watch).",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    try:
+        root = _resolve_root(args.root, allow_network=args.allow_network)
+    except (SafetyError, FileNotFoundError) as exc:
+        raise SystemExit(str(exc)) from exc
+
+    if args.mode in {"apply", "watch"} and not args.allow_rename:
+        raise SystemExit(
+            "Modo de alteração bloqueado. Revise o manifesto e repita com --allow-rename "
+            "somente quando realmente quiser renomear arquivos."
+        )
+
     if args.mode == "discover":
-        root = _validate_root(args.root)
+        root = _validate_root(root)
         fotos = discover_fotos_dirs(root)
         instrumentation = discover_instrumentation_dirs(root)
         images = list(iter_images_in_targets(root, instrumentation))
@@ -644,7 +716,7 @@ def main() -> None:
     if args.mode == "watch":
         try:
             watch(
-                args.root,
+                root,
                 classifier,
                 template=args.template,
                 interval=args.interval,
@@ -659,7 +731,7 @@ def main() -> None:
 
     apply = args.mode == "apply"
     classified, renamed, review = process_existing(
-        args.root,
+        root,
         classifier,
         template=args.template,
         manifest=args.manifest,

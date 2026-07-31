@@ -163,3 +163,23 @@ def test_instrumentacao_outside_fotos_is_never_classified(tmp_path: Path) -> Non
         cache=None,
     )
     assert fake.calls == []
+
+
+def test_default_local_root_prefers_dados_e_marina(tmp_path: Path, monkeypatch) -> None:
+    project = tmp_path / "repo"
+    sandbox = project / "Dados e Marina"
+    sandbox.mkdir(parents=True)
+    monkeypatch.setattr(manager, "PROJECT_ROOT", project)
+    monkeypatch.chdir(project)
+    assert manager._default_local_root() == sandbox
+
+
+def test_unc_network_path_is_blocked_without_opt_in() -> None:
+    network = Path(r"\\LABOCEANOSERVER\laboceano\Projetos")
+    with pytest.raises(manager.SafetyError):
+        manager._resolve_root(network, allow_network=False)
+
+
+def test_unc_network_path_is_allowed_only_with_opt_in() -> None:
+    network = Path(r"\\LABOCEANOSERVER\laboceano\Projetos")
+    assert manager._resolve_root(network, allow_network=True) == network
