@@ -151,27 +151,55 @@ def _relative_parts(path: Path, root: Path) -> tuple[str, ...]:
         raise SafetyError(f"Caminho fora da raiz permitida: {path}") from exc
 
 
-def _target_indexes(path: Path, root: Path) -> tuple[tuple[str, ...], int, int]:
-    """Return (parts, fotos_index, instrumentation_index) for an approved file path."""
+def _target_indexes(
+    path: Path,
+    root: Path,
+) -> tuple[tuple[str, ...], int, int]:
+    """Valida imagens na hierarquia permitida.
+
+    Servidor/rede:
+        Fotos/.../Instrumenta??o/.../imagem
+
+    C?pia local:
+        permite tamb?m Instrumenta??o/.../imagem diretamente.
+    """
     parts = _relative_parts(path, root)
     directory_parts = parts[:-1]
+
     fotos_indexes = [
-        i for i, part in enumerate(directory_parts)
+        i
+        for i, part in enumerate(directory_parts)
         if _normalize_component(part) == FOTOS_COMPONENT
     ]
+
+    instrumentacao_indexes = [
+        i
+        for i, part in enumerate(directory_parts)
+        if _normalize_component(part) == INSTRUMENTATION_COMPONENT
+    ]
+
     valid_pairs: list[tuple[int, int]] = []
-    for instr_idx, part in enumerate(directory_parts):
-        if _normalize_component(part) != INSTRUMENTATION_COMPONENT:
-            continue
-        preceding = [idx for idx in fotos_indexes if idx < instr_idx]
+
+    for instr_idx in instrumentacao_indexes:
+        preceding = [
+            idx
+            for idx in fotos_indexes
+            if idx < instr_idx
+        ]
         if preceding:
             valid_pairs.append((preceding[-1], instr_idx))
-    if not valid_pairs:
-        raise SafetyError(
-            f"Recusado: {path} não segue a hierarquia Fotos/.../Instrumentação"
-        )
-    fotos_idx, instr_idx = valid_pairs[-1]
-    return parts, fotos_idx, instr_idx
+
+    if valid_pairs:
+        fotos_idx, instr_idx = valid_pairs[-1]
+        return parts, fotos_idx, instr_idx
+
+    # Somente c?pias locais podem usar Instrumenta??o diretamente.
+    if not _looks_like_network_path(root) and instrumentacao_indexes:
+        return parts, -1, instrumentacao_indexes[-1]
+
+    raise SafetyError(
+        f"Recusado: {path} n?o est? em uma pasta Instrumenta??o eleg?vel"
+    )
 
 
 def is_inside_target_hierarchy(path: Path, root: Path) -> bool:
@@ -224,15 +252,41 @@ def discover_fotos_dirs(root: Path) -> list[Path]:
 def discover_instrumentation_dirs(root: Path) -> list[Path]:
     root = _validate_root(root)
     found: set[Path] = set()
+
+    # Na c?pia local, aceita Instrumenta??o diretamente,
+    # mesmo sem uma pasta Fotos acima dela.
+    if not _looks_like_network_path(root):
+        if _normalize_component(root.name) == INSTRUMENTATION_COMPONENT:
+            found.add(root)
+
+        for current, dirnames, _filenames in _safe_walk(root):
+            for name in list(dirnames):
+                if _normalize_component(name) == INSTRUMENTATION_COMPONENT:
+                    candidate = current / name
+                    found.add(candidate)
+
+                    # A varredura das imagens ser? feita depois.
+                    dirnames.remove(name)
+
+        return sorted(
+            found,
+            key=lambda p: str(p).casefold(),
+        )
+
+    # Em servidor/rede, a regra continua obrigat?ria:
+    # Fotos -> Instrumenta??o.
     for fotos_dir in discover_fotos_dirs(root):
         for current, dirnames, _filenames in _safe_walk(fotos_dir):
             for name in list(dirnames):
                 if _normalize_component(name) == INSTRUMENTATION_COMPONENT:
                     candidate = current / name
                     found.add(candidate)
-                    # Later recursion scans every image below this directory.
                     dirnames.remove(name)
-    return sorted(found, key=lambda p: str(p).casefold())
+
+    return sorted(
+        found,
+        key=lambda p: str(p).casefold(),
+    )
 
 
 def iter_images_in_targets(root: Path, targets: Sequence[Path]) -> Iterable[Path]:
