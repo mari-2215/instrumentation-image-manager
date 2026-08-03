@@ -8,20 +8,20 @@ Classificador visual e renomeador seguro para fotos de instrumentação do LABOC
 
 A versão padrão **NÃO acessa o servidor**.
 
-Sem informar caminho, o programa procura uma sandbox local chamada:
+Sem informar caminho, o programa procura uma raiz local padrão em:
 
 ```text
-Dados e Marina
+D:\Marina
 ```
 
-Ela pode ficar dentro ou ao lado do repositório. Também é possível definir um caminho local com a variável `IIM_SANDBOX_ROOT` ou passar um caminho explicitamente.
+Também é possível definir um caminho local diferente com a variável `IIM_SANDBOX_ROOT` ou passar um caminho explicitamente.
 
 Além disso:
 
 - executar o script sem argumentos equivale a `discover` e não altera arquivos;
 - caminhos UNC/de rede (`\\servidor\...`) são bloqueados sem `--allow-network`;
 - `apply` e `watch` são bloqueados sem `--allow-rename`;
-- `Dados e Marina/` está no `.gitignore`, evitando publicar as fotos no GitHub;
+- `Marina/` está no `.gitignore` como proteção extra se você fizer uma cópia local dentro do projeto;
 - nenhuma imagem fora da hierarquia `Fotos -> Instrumentação` é elegível;
 - imagens incertas ficam como `REVISAR` e não são renomeadas automaticamente.
 
@@ -49,7 +49,7 @@ Uma pasta `Instrumentação` que não esteja abaixo de `Fotos` é ignorada.
 pip install -r requirements.txt
 ```
 
-4. Copie a pasta de teste para dentro ou ao lado do projeto com o nome `Dados e Marina`.
+4. Garanta que sua cópia local esteja em `D:\Marina`, ou passe um caminho local explicitamente.
 5. Rode primeiro:
 
 ```powershell
@@ -78,7 +78,7 @@ O CSV registra:
 
 Nada é renomeado durante `classify`.
 
-## Aplicar rename somente na sandbox
+## Aplicar rename somente na cópia local
 
 Depois de revisar o CSV:
 

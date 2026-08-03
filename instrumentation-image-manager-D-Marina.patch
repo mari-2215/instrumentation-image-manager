@@ -1,0 +1,164 @@
+diff --git a/.gitignore b/.gitignore
+index 430bd29..9982b54 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -9,5 +9,5 @@ resultado*.csv
+ .cache/
+ 
+ # SANDBOX LOCAL — NUNCA versionar fotos copiadas do servidor
+-Dados e Marina/
+-**/Dados e Marina/
++Marina/
++**/Marina/
+diff --git a/APLICAR_COM_CUIDADO.ps1 b/APLICAR_COM_CUIDADO.ps1
+index 1dc4d7b..9f48f9c 100644
+--- a/APLICAR_COM_CUIDADO.ps1
++++ b/APLICAR_COM_CUIDADO.ps1
+@@ -1,5 +1,5 @@
+ $ErrorActionPreference = "Stop"
+-Write-Host "ATENÇÃO: este comando atua SOMENTE na sandbox local 'Dados e Marina'." -ForegroundColor Yellow
++Write-Host "ATENÇÃO: este comando atua SOMENTE na sandbox local 'D:\Marina'." -ForegroundColor Yellow
+ Write-Host "Imagens marcadas REVISAR permanecerão intactas." -ForegroundColor Yellow
+ $ok = Read-Host "Digite APLICAR para permitir renomes na cópia local"
+ if ($ok -ne "APLICAR") {
+diff --git a/README.md b/README.md
+index 97ecc7d..71401bd 100644
+--- a/README.md
++++ b/README.md
+@@ -8,20 +8,20 @@ Classificador visual e renomeador seguro para fotos de instrumentação do LABOC
+ 
+ A versão padrão **NÃO acessa o servidor**.
+ 
+-Sem informar caminho, o programa procura uma sandbox local chamada:
++Sem informar caminho, o programa procura uma raiz local padrão em:
+ 
+ ```text
+-Dados e Marina
++D:\Marina
+ ```
+ 
+-Ela pode ficar dentro ou ao lado do repositório. Também é possível definir um caminho local com a variável `IIM_SANDBOX_ROOT` ou passar um caminho explicitamente.
++Também é possível definir um caminho local diferente com a variável `IIM_SANDBOX_ROOT` ou passar um caminho explicitamente.
+ 
+ Além disso:
+ 
+ - executar o script sem argumentos equivale a `discover` e não altera arquivos;
+ - caminhos UNC/de rede (`\\servidor\...`) são bloqueados sem `--allow-network`;
+ - `apply` e `watch` são bloqueados sem `--allow-rename`;
+-- `Dados e Marina/` está no `.gitignore`, evitando publicar as fotos no GitHub;
++- `Marina/` está no `.gitignore` como proteção extra se você fizer uma cópia local dentro do projeto;
+ - nenhuma imagem fora da hierarquia `Fotos -> Instrumentação` é elegível;
+ - imagens incertas ficam como `REVISAR` e não são renomeadas automaticamente.
+ 
+@@ -49,7 +49,7 @@ Uma pasta `Instrumentação` que não esteja abaixo de `Fotos` é ignorada.
+ pip install -r requirements.txt
+ ```
+ 
+-4. Copie a pasta de teste para dentro ou ao lado do projeto com o nome `Dados e Marina`.
++4. Garanta que sua cópia local esteja em `D:\Marina`, ou passe um caminho local explicitamente.
+ 5. Rode primeiro:
+ 
+ ```powershell
+@@ -78,7 +78,7 @@ O CSV registra:
+ 
+ Nada é renomeado durante `classify`.
+ 
+-## Aplicar rename somente na sandbox
++## Aplicar rename somente na cópia local
+ 
+ Depois de revisar o CSV:
+ 
+diff --git a/classificar.ps1 b/classificar.ps1
+index 2923383..91adf98 100644
+--- a/classificar.ps1
++++ b/classificar.ps1
+@@ -1,4 +1,4 @@
+ $ErrorActionPreference = "Stop"
+-Write-Host "MODO SEGURO LOCAL: classificando somente a sandbox 'Dados e Marina'." -ForegroundColor Cyan
++Write-Host "MODO SEGURO LOCAL: classificando somente a sandbox 'D:\Marina'." -ForegroundColor Cyan
+ & .\.venv\Scripts\python.exe tools\instrumentacao_image_manager.py classify --manifest resultado_classificacao.csv
+ Write-Host "Abra resultado_classificacao.csv e revise antes de qualquer apply." -ForegroundColor Yellow
+diff --git a/descobrir.ps1 b/descobrir.ps1
+index 10ae125..464277d 100644
+--- a/descobrir.ps1
++++ b/descobrir.ps1
+@@ -1,3 +1,3 @@
+ $ErrorActionPreference = "Stop"
+-Write-Host "MODO SEGURO LOCAL: procurando a sandbox 'Dados e Marina'." -ForegroundColor Cyan
++Write-Host "MODO SEGURO LOCAL: procurando a sandbox 'D:\Marina'." -ForegroundColor Cyan
+ & .\.venv\Scripts\python.exe tools\instrumentacao_image_manager.py discover
+diff --git a/tests/test_manager.py b/tests/test_manager.py
+index c2b4b26..6334095 100644
+--- a/tests/test_manager.py
++++ b/tests/test_manager.py
+@@ -165,11 +165,12 @@ def test_instrumentacao_outside_fotos_is_never_classified(tmp_path: Path) -> Non
+     assert fake.calls == []
+ 
+ 
+-def test_default_local_root_prefers_dados_e_marina(tmp_path: Path, monkeypatch) -> None:
++def test_default_local_root_prefers_d_marina(tmp_path: Path, monkeypatch) -> None:
+     project = tmp_path / "repo"
+-    sandbox = project / "Dados e Marina"
++    sandbox = project / "Marina"
+     sandbox.mkdir(parents=True)
+     monkeypatch.setattr(manager, "PROJECT_ROOT", project)
++    monkeypatch.setattr(manager, "DEFAULT_LOCAL_ROOT", Path(r"D:\Marina"))
+     monkeypatch.chdir(project)
+     assert manager._default_local_root() == sandbox
+ 
+diff --git a/tools/instrumentacao_image_manager.py b/tools/instrumentacao_image_manager.py
+index 904001b..729c780 100755
+--- a/tools/instrumentacao_image_manager.py
++++ b/tools/instrumentacao_image_manager.py
+@@ -37,7 +37,7 @@ IMAGE_EXTENSIONS = {
+ FOTOS_COMPONENT = "fotos"
+ INSTRUMENTATION_COMPONENT = "instrumentacao"
+ PROJECT_ROOT = Path(__file__).resolve().parents[1]
+-SANDBOX_FOLDER_NAME = "Dados e Marina"
++DEFAULT_LOCAL_ROOT = Path(r"D:\Marina")
+ LABOCEANO_SERVER_ROOT = Path(r"\\LABOCEANOSERVER\laboceano\Projetos")
+ DEFAULT_CLASSES_FILE = PROJECT_ROOT / "config" / "classes.json"
+ DEFAULT_MANIFEST = Path("classification_manifest.csv")
+@@ -90,16 +90,17 @@ def _looks_like_network_path(path: Path) -> bool:
+ 
+ 
+ def _default_local_root() -> Path:
+-    """Locate a local sandbox named 'Dados e Marina' without touching the network."""
++    """Locate the default local root without touching the network."""
+     env_root = os.environ.get("IIM_SANDBOX_ROOT")
+     candidates: list[Path] = []
+     if env_root:
+         candidates.append(Path(env_root))
+     candidates.extend([
+-        PROJECT_ROOT / SANDBOX_FOLDER_NAME,
+-        PROJECT_ROOT.parent / SANDBOX_FOLDER_NAME,
+-        Path.cwd() / SANDBOX_FOLDER_NAME,
+-        Path.cwd().parent / SANDBOX_FOLDER_NAME,
++        DEFAULT_LOCAL_ROOT,
++        PROJECT_ROOT / "Marina",
++        PROJECT_ROOT.parent / "Marina",
++        Path.cwd() / "Marina",
++        Path.cwd().parent / "Marina",
+     ])
+     seen: set[str] = set()
+     for candidate in candidates:
+@@ -111,8 +112,8 @@ def _default_local_root() -> Path:
+             return candidate
+     tried = "\n  - ".join(str(p) for p in candidates)
+     raise FileNotFoundError(
+-        "Sandbox local não encontrada. Crie/copiei a pasta 'Dados e Marina' "
+-        "dentro ou ao lado do repositório, defina IIM_SANDBOX_ROOT, ou passe um "
++        "Raiz local padrão não encontrada. Garanta que exista 'D:\\Marina', "
++        "defina IIM_SANDBOX_ROOT, ou passe um "
+         "caminho local explicitamente.\nTentativas:\n  - " + tried
+     )
+ 
+@@ -655,7 +656,7 @@ def parse_args() -> argparse.Namespace:
+     )
+     parser.add_argument(
+         "root", type=Path, nargs="?", default=None,
+-        help="Padrão: sandbox local 'Dados e Marina'; nunca o servidor.",
++        help="Padrão: raiz local 'D:\\Marina'; nunca o servidor.",
+     )
+     parser.add_argument("--classes", type=Path, default=DEFAULT_CLASSES_FILE)
+     parser.add_argument("--classifier", choices=("clip",), default="clip")

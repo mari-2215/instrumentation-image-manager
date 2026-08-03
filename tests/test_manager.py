@@ -165,11 +165,12 @@ def test_instrumentacao_outside_fotos_is_never_classified(tmp_path: Path) -> Non
     assert fake.calls == []
 
 
-def test_default_local_root_prefers_dados_e_marina(tmp_path: Path, monkeypatch) -> None:
+def test_default_local_root_prefers_d_marina(tmp_path: Path, monkeypatch) -> None:
     project = tmp_path / "repo"
-    sandbox = project / "Dados e Marina"
+    sandbox = project / "Marina"
     sandbox.mkdir(parents=True)
     monkeypatch.setattr(manager, "PROJECT_ROOT", project)
+    monkeypatch.setattr(manager, "DEFAULT_LOCAL_ROOT", Path(r"D:\Marina"))
     monkeypatch.chdir(project)
     assert manager._default_local_root() == sandbox
 

@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-Write-Host "ATENÇÃO: este comando atua SOMENTE na sandbox local 'Dados e Marina'." -ForegroundColor Yellow
+Write-Host "ATENÇÃO: este comando atua SOMENTE na sandbox local 'D:\Marina'." -ForegroundColor Yellow
 Write-Host "Imagens marcadas REVISAR permanecerão intactas." -ForegroundColor Yellow
 $ok = Read-Host "Digite APLICAR para permitir renomes na cópia local"
 if ($ok -ne "APLICAR") {

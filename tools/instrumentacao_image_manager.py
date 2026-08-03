@@ -37,7 +37,7 @@ IMAGE_EXTENSIONS = {
 FOTOS_COMPONENT = "fotos"
 INSTRUMENTATION_COMPONENT = "instrumentacao"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SANDBOX_FOLDER_NAME = "Dados e Marina"
+DEFAULT_LOCAL_ROOT = Path(r"D:\Marina")
 LABOCEANO_SERVER_ROOT = Path(r"\\LABOCEANOSERVER\laboceano\Projetos")
 DEFAULT_CLASSES_FILE = PROJECT_ROOT / "config" / "classes.json"
 DEFAULT_MANIFEST = Path("classification_manifest.csv")
@@ -90,16 +90,17 @@ def _looks_like_network_path(path: Path) -> bool:
 
 
 def _default_local_root() -> Path:
-    """Locate a local sandbox named 'Dados e Marina' without touching the network."""
+    """Locate the default local root without touching the network."""
     env_root = os.environ.get("IIM_SANDBOX_ROOT")
     candidates: list[Path] = []
     if env_root:
         candidates.append(Path(env_root))
     candidates.extend([
-        PROJECT_ROOT / SANDBOX_FOLDER_NAME,
-        PROJECT_ROOT.parent / SANDBOX_FOLDER_NAME,
-        Path.cwd() / SANDBOX_FOLDER_NAME,
-        Path.cwd().parent / SANDBOX_FOLDER_NAME,
+        DEFAULT_LOCAL_ROOT,
+        PROJECT_ROOT / "Marina",
+        PROJECT_ROOT.parent / "Marina",
+        Path.cwd() / "Marina",
+        Path.cwd().parent / "Marina",
     ])
     seen: set[str] = set()
     for candidate in candidates:
@@ -111,8 +112,8 @@ def _default_local_root() -> Path:
             return candidate
     tried = "\n  - ".join(str(p) for p in candidates)
     raise FileNotFoundError(
-        "Sandbox local não encontrada. Crie/copiei a pasta 'Dados e Marina' "
-        "dentro ou ao lado do repositório, defina IIM_SANDBOX_ROOT, ou passe um "
+        "Raiz local padrão não encontrada. Garanta que exista 'D:\\Marina', "
+        "defina IIM_SANDBOX_ROOT, ou passe um "
         "caminho local explicitamente.\nTentativas:\n  - " + tried
     )
 
@@ -655,7 +656,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "root", type=Path, nargs="?", default=None,
-        help="Padrão: sandbox local 'Dados e Marina'; nunca o servidor.",
+        help="Padrão: raiz local 'D:\\Marina'; nunca o servidor.",
     )
     parser.add_argument("--classes", type=Path, default=DEFAULT_CLASSES_FILE)
     parser.add_argument("--classifier", choices=("clip",), default="clip")
